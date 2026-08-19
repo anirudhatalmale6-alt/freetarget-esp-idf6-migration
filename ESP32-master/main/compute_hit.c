@@ -9,8 +9,8 @@
 #include "stdio.h"
 #include "math.h"
 #include "stdbool.h"
-#include "gpio_types.h"
-#include "driver\gpio.h"
+#include "hal/gpio_types.h"
+#include "driver/gpio.h"
 
 #include "freETarget.h"
 #include "analog_io.h"
@@ -34,12 +34,16 @@
 /*
  *  Variables
  */
+// TODO(IDF6): switched to designated initializers. The remaining fields of
+// sensor_t are still zero-initialised exactly as before - this is purely to
+// tell GCC 15 the omission is deliberate, since -Wextra now makes
+// -Wmissing-field-initializers an error and it does not fire on designators.
 sensor_t s[4] = {
     // Contains variables,do not make const
-    {0, {'n', "NORTH_LO", LED_NORTH_FAILED, RUN_NORTH_LO, BIT_NORTH_LO}, {'N', "NORTH_HI", LED_NORTH_FAILED, RUN_NORTH_HI, BIT_NORTH_HI}},
-    {1, {'e', "EAST_LO", LED_EAST_FAILED, RUN_EAST_LO, BIT_EAST_LO},     {'E', "EAST_HI", LED_EAST_FAILED, RUN_EAST_HI, BIT_EAST_HI}    },
-    {2, {'s', "SOUTH_LO", LED_SOUTH_FAILED, RUN_SOUTH_LO, BIT_SOUTH_LO}, {'S', "SOUTH_HI", LED_SOUTH_FAILED, RUN_SOUTH_HI, BIT_SOUTH_HI}},
-    {3, {'w', "WEST_LO", LED_WEST_FAILED, RUN_WEST_LO, BIT_WEST_LO},     {'W', "WEST_HI", LED_WEST_FAILED, RUN_WEST_HI, BIT_WEST_HI}    }
+    {.index = 0, .low_sense = {'n', "NORTH_LO", LED_NORTH_FAILED, RUN_NORTH_LO, BIT_NORTH_LO}, .high_sense = {'N', "NORTH_HI", LED_NORTH_FAILED, RUN_NORTH_HI, BIT_NORTH_HI}},
+    {.index = 1, .low_sense = {'e', "EAST_LO", LED_EAST_FAILED, RUN_EAST_LO, BIT_EAST_LO},     .high_sense = {'E', "EAST_HI", LED_EAST_FAILED, RUN_EAST_HI, BIT_EAST_HI}    },
+    {.index = 2, .low_sense = {'s', "SOUTH_LO", LED_SOUTH_FAILED, RUN_SOUTH_LO, BIT_SOUTH_LO}, .high_sense = {'S', "SOUTH_HI", LED_SOUTH_FAILED, RUN_SOUTH_HI, BIT_SOUTH_HI}},
+    {.index = 3, .low_sense = {'w', "WEST_LO", LED_WEST_FAILED, RUN_WEST_LO, BIT_WEST_LO},     .high_sense = {'W', "WEST_HI", LED_WEST_FAILED, RUN_WEST_HI, BIT_WEST_HI}    }
 };
 
 unsigned int        pellet_calibre;         // Time offset to compensate for pellet diameter
@@ -677,7 +681,10 @@ static void remap_target(shot_record_t *shot)
   dx = 0.0;
   dy = 0.0;
 
-  new_target_t *ptr;        // Bull pointer
+  // TODO(IDF6): was  new_target_t *ptr;  - ptr_list[] is an array of
+  // const new_target_t *, so assigning one to a non-const pointer throws
+  // away the const. Read-only here, so const is the honest type.
+  const new_target_t *ptr;  // Bull pointer
 
   if ( (json_target_type <= 1) || (json_target_type > sizeof(ptr_list) / sizeof(new_target_t *)) )
   {

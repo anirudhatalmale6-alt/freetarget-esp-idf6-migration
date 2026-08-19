@@ -22,14 +22,14 @@
 #include "esp_flash_partitions.h"
 #include "esp_partition.h"
 #include "errno.h"
-#include "gpio_types.h"
-#include "driver\gpio.h"
+#include "hal/gpio_types.h"
+#include "driver/gpio.h"
 
 #include "freETarget.h"
 #include "board_assembly.h"
 #include "helpers.h"
 #include "diag_tools.h"
-#include "ota.h"
+#include "OTA.h"
 #include "json.h"
 #include "gpio.h"
 #include "gpio_define.h"
@@ -389,7 +389,10 @@ void OTA_serial(unsigned int OTA_download_size) // Size of the incoming file
       data_read = OTA_download_size - bytes_received;                   // Yes, use a shorter block
     }
 
-    data_read = get_OTA_serial(data_read, &ota_write_data);             // String to return the S-record
+    // TODO(IDF6): was get_OTA_serial(data_read, &ota_write_data).
+    // ota_write_data is already a char array, so & gave a pointer to array
+    // where a char * was wanted. Same address, no behaviour change.
+    data_read = get_OTA_serial(data_read, ota_write_data);              // String to return the S-record
     if ( data_read < 0 )                                                // Error getting data
     {
       set_status_LED(LED_OTA_FATAL);                                    // Show the error on the LED

@@ -40,7 +40,11 @@ extern const json_message_t JSON[];
 /*
  * Definitioins
  */
+// TODO(IDF6): #undef added. Several headers in this project define EXTERN,
+// so whichever is included second redefines it. That was always a warning;
+// GCC 15 with -Werror makes it fatal. Behaviour is unchanged.
 #ifdef JSON_C
+#undef EXTERN
 #define EXTERN
 #else
 #undef EXTERN
@@ -131,9 +135,25 @@ EXTERN real_t        json_vset;                      // Desired voltage setpont
 EXTERN int           json_follow_through;            // Follow through timer
 EXTERN int           json_keep_alive;                // Keepalive period
 EXTERN int           json_face_strike;               // Number of cycles to accept a face strike
-EXTERN int        json_rapid_time;                // When will the rapid fire event end
+// TODO(IDF6): *** PLEASE LOOK AT THIS ONE *** - was  EXTERN int  for both
+// json_rapid_time and json_rapid_wait (a few lines apart). Changed to real_t.
+//
+// Everything else in this package treats them as real_t:
+//   - json.c marks both rows IS_FLOAT, so the parser writes a double
+//     through them - 8 bytes into a 4 byte int, which corrupts whatever
+//     follows in memory;
+//   - timed_fire.c stores their addresses in rapid_state_t.timer, declared
+//     real_t *, and dereferences them as double;
+//   - your master package declares both real_t.
+//
+// So "int" here is the odd one out and, as written, it is a live memory
+// corruption bug rather than just a compile error. I have made them real_t
+// to match. If you are deliberately converting these to integers in this
+// branch, then json.c needs IS_INT32 and timed_fire.c needs an int * field
+// instead - tell me which way you want it and I will do the rest.
+EXTERN real_t     json_rapid_time;                // When will the rapid fire event end
 EXTERN int           json_wifi_channel;              // Channel assigned to this SSID
-EXTERN int           json_rapid_wait;                // Delay applied to rapid fire
+EXTERN real_t        json_rapid_wait;                // Delay applied to rapid fire // TODO(IDF6): was int - see json_rapid_time above
 EXTERN int           json_wifi_dhcp;                 // TRUE if the DHCP server is enabled
 EXTERN char          json_wifi_static_ip[IP_SIZE];   // Static IP assigned to the target
 EXTERN char          json_wifi_server_ip[IP_SIZE];   // IP assigned to the server

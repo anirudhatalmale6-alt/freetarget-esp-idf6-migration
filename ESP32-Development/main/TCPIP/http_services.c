@@ -387,7 +387,11 @@ static esp_err_t service_get_menu(httpd_req_t *req)
    */
   target_name(my_name);                                 // Get the target name
   httpd_resp_set_hdr(req, "get_menu", my_name);
-  http_printf(&menu_html_start, req, SIZEOF_menu_HTML); // point to the target HTML file
+  // TODO(IDF6): was http_printf(&menu_html_start, ...). menu_html_start is
+  // declared const unsigned char[] by the EMBED_FILES machinery, so & gave a
+  // pointer to array, and the element type is unsigned char against the
+  // const char * the function wants. Same address either way.
+  http_printf((const char *)menu_html_start, req, SIZEOF_menu_HTML); // point to the target HTML file
 
   return ESP_OK;
 }

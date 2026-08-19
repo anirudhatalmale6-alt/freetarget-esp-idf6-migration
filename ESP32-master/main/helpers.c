@@ -12,7 +12,7 @@
 #include <stdio.h>
 #include "string.h"
 #include "ctype.h"
-#include "driver\gpio.h"
+#include "driver/gpio.h"
 #include "math.h"
 #include "esp_timer.h"
 #include "esp_random.h"
@@ -26,7 +26,7 @@
 #include "gpio_define.h"
 #include "diag_tools.h"
 #include "analog_io.h"
-#include "wifi.h"
+#include "WiFi.h"
 #include "serial_io.h"
 
 #define SHOT_TIME_TO_SECONDS(x) ((real_t)(x)) / 1000000.0
@@ -186,10 +186,12 @@ int instr(char *s1, // Source string
  *-----------------------------------------------------
  *
  *-----------------------------------------------------*/
-bool contains(char *source,                    // Source string
-              char *match)                     // Comparison string
+// TODO(IDF6): parameters are now const - read only, and callers pass
+// req->uri which is const char *. See helpers.h.
+bool contains(const char *source,               // Source string
+              const char *match)                // Comparison string
 {
-  char *start;
+  const char *start;
 
   start = match;                               // Save the start of the comparison string
 
@@ -650,7 +652,8 @@ int http_target_type(void)
  * reduces the rest of the sthring to an argument
  *
  *--------------------------------------------------------------*/
-void squish(char *uri,      // URI to squish
+// TODO(IDF6): uri is now const - read only, and callers pass req->uri.
+void squish(const char *uri, // URI to squish
             char *argument) // Argument to return
 {
   unsigned char ch;

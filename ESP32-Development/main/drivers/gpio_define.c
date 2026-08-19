@@ -20,8 +20,8 @@
 #include "driver/gpio.h"
 #include "driver/ledc.h"
 #include "driver/pulse_cnt.h"
-#include "gpio_types.h"
-#include "adc_types.h"
+#include "hal/gpio_types.h"
+#include "hal/adc_types.h"
 #include "esp_adc/adc_oneshot.h"
 #include "led_strip.h"
 #include "led_strip_types.h"
@@ -45,26 +45,45 @@ const DIO_struct_t dio00 = {.type = DIGITAL_IO_IN, .mode = GPIO_MODE_INPUT, .ini
 const DIO_struct_t dio01 = {.type = DIGITAL_IO_IN, .mode = GPIO_MODE_INPUT, .initial_value = 0};                  // Mode and Initial Value
 const DIO_struct_t dio02 = {.type = DIGITAL_IO_IN, .mode = GPIO_MODE_INPUT, .initial_value = 0};                  // Mode and Initial Value
 const DIO_struct_t dio03 = {.type = DIGITAL_IO_IN, .mode = GPIO_MODE_INPUT, .initial_value = 0};                  // Mode and Initial Value
+/*
+ * TODO(IDF6): the .callback initialisers below are cast to the field type.
+ *
+ * DIO_struct_t declares  bool (*callback)(void)  but the four PCNT handlers
+ * are  bool (*)(void *)  and face_strike_ISR() is  void (*)(void)  - none of
+ * them ever matched. Everything that reads the field casts it to gpio_isr_t
+ * (void (*)(void *)) before use, further down this file, so the declared
+ * type has never been the type actually in play.
+ *
+ * GCC 15 makes the mismatch an error (-Wincompatible-pointer-types), and a
+ * direct function-pointer cast is also an error (-Werror=cast-function-type),
+ * so these route via (void *). Behaviour and generated code are unchanged.
+ *
+ * The real fix is to declare the field  void (*callback)(void *)  - i.e.
+ * gpio_isr_t, which is what it is - and give face_strike_ISR a void *
+ * parameter it ignores. That removes every cast in this file. I have left
+ * it alone because this is your production tree and it is a header change
+ * that ripples; say the word and I will do it.
+ */
 const DIO_struct_t dio04 = {.type = DIGITAL_IO_IN, .mode = GPIO_MODE_INPUT, .initial_value = 0};                  // Mode and Initial Value
 const DIO_struct_t dio05 = {.type = DIGITAL_IO_IN, .mode = GPIO_MODE_INPUT, .initial_value = 0};                  // Mode and Initial Value
 const DIO_struct_t dio06 = {.type = DIGITAL_IO_IN, .mode = GPIO_MODE_INPUT, .initial_value = 0};                  // Mode and Initial Value
 const DIO_struct_t dio07 = {.type = DIGITAL_IO_IN, .mode = GPIO_MODE_INPUT, .initial_value = 0};                  // Mode and Initial Value
 const DIO_struct_t dio08 = {.type = DIGITAL_IO_IN, .mode = GPIO_MODE_INPUT, .initial_value = 0};                  // Mode and Initial Value
 const DIO_struct_t dio09 = {
-    .type = DIGITAL_IO_IN, .mode = GPIO_MODE_INPUT, .initial_value = 0, .callback = &east_hi_pcnt_isr_callback};  // Mode and Initial Value
+    .type = DIGITAL_IO_IN, .mode = GPIO_MODE_INPUT, .initial_value = 0, .callback = (bool (*)(void))(void *)&east_hi_pcnt_isr_callback};  // Mode and Initial Value
 
 const DIO_struct_t dioR9 = {.type = DIGITAL_IO_OUT, .mode = GPIO_MODE_OUTPUT, .initial_value = 0};                // Shared with dio09
 
 const DIO_struct_t dio10 = {
-    .type = DIGITAL_IO_IN, .mode = GPIO_MODE_INPUT, .initial_value = 0, .callback = &south_hi_pcnt_isr_callback}; // Mode and Initial Value
+    .type = DIGITAL_IO_IN, .mode = GPIO_MODE_INPUT, .initial_value = 0, .callback = (bool (*)(void))(void *)&south_hi_pcnt_isr_callback}; // Mode and Initial Value
 const DIO_struct_t dio11 = {
-    .type = DIGITAL_IO_IN, .mode = GPIO_MODE_INPUT, .initial_value = 0, .callback = &west_hi_pcnt_isr_callback};  // Mode and Initial Value
+    .type = DIGITAL_IO_IN, .mode = GPIO_MODE_INPUT, .initial_value = 0, .callback = (bool (*)(void))(void *)&west_hi_pcnt_isr_callback};  // Mode and Initial Value
 const DIO_struct_t dio12 = {.type = DIGITAL_IO_OUT, .mode = GPIO_MODE_OUTPUT, .initial_value = 0};                // Mode and Initial Value
 const DIO_struct_t dio13 = {.type = DIGITAL_IO_IN, .mode = GPIO_MODE_INPUT, .initial_value = 0};                  // Mode and Initial Value
 const DIO_struct_t dio14 = {.type = DIGITAL_IO_IN, .mode = GPIO_MODE_INPUT, .initial_value = 0};                  // Mode and Initial Value
 const DIO_struct_t dio15 = {.type = DIGITAL_IO_IN, .mode = GPIO_MODE_INPUT, .initial_value = 0};                  // Mode and Initial Value
 const DIO_struct_t dio16 = {
-    .type = PCNT_HI, .mode = GPIO_MODE_INPUT, .initial_value = 0, .callback = &north_hi_pcnt_isr_callback};       // Mode and Initial Value
+    .type = PCNT_HI, .mode = GPIO_MODE_INPUT, .initial_value = 0, .callback = (bool (*)(void))(void *)&north_hi_pcnt_isr_callback};       // Mode and Initial Value
 const DIO_struct_t dio17 = {.type = DIGITAL_IO_IN, .mode = GPIO_MODE_INPUT, .initial_value = 0};                  // Mode and Initial Value
 const DIO_struct_t dio18 = {.type = DIGITAL_IO_IN, .mode = GPIO_MODE_INPUT, .initial_value = 0};                  // Mode and Initial Value
 const DIO_struct_t dio19 = {.type = DIGITAL_IO_IN, .mode = GPIO_MODE_INPUT, .initial_value = 0};                  // Mode and Initial Value
@@ -92,7 +111,7 @@ const DIO_struct_t dio38 = {.type = DIGITAL_IO_IN, .mode = GPIO_MODE_INPUT, .ini
 const DIO_struct_t dio39 = {.type = DIGITAL_IO_IN, .mode = GPIO_MODE_INPUT, .initial_value = 0};      // Can only be input // AMB
 
 const DIO_struct_t dio40 = {
-    .type = DIGITAL_IO_IN, .mode = GPIO_MODE_INPUT, .initial_value = 0, .callback = face_strike_ISR}; // Mode and Initial Value
+    .type = DIGITAL_IO_IN, .mode = GPIO_MODE_INPUT, .initial_value = 0, .callback = (bool (*)(void))(void *)face_strike_ISR}; // Mode and Initial Value
 const DIO_struct_t dio41 = {.type = DIGITAL_IO_OUT, .mode = GPIO_MODE_OUTPUT, .initial_value = 1};    // Mode and Initial Value
 const DIO_struct_t dio42 = {.type = DIGITAL_IO_OUT, .mode = GPIO_MODE_OUTPUT, .initial_value = 0};    // Mode and Initial Value
 const DIO_struct_t dio43 = {.type = DIGITAL_IO_OUT, .mode = GPIO_MODE_OUTPUT, .initial_value = 0};    // Mode and Initial Value
@@ -310,11 +329,11 @@ void gpio_init_single(unsigned int type)                                        
           gpio_set_direction(gpio_table[i].gpio_number, GPIO_MODE_INPUT);
           gpio_set_pull_mode(gpio_table[i].gpio_number, GPIO_PULLUP_ONLY);
 
-          if ( (gpio_isr_t)((const DIO_struct_t *)(gpio_table[i].gpio_uses))->callback != NULL )
+          if ( (gpio_isr_t)(void *)((const DIO_struct_t *)(gpio_table[i].gpio_uses))->callback != NULL )
           {
             gpio_intr_disable(gpio_table[i].gpio_number);
             gpio_set_intr_type(gpio_table[i].gpio_number, GPIO_INTR_POSEDGE); // Setup the interrupt handler
-            gpio_isr_handler_add(gpio_table[i].gpio_number, (gpio_isr_t)((const DIO_struct_t *)(gpio_table[i].gpio_uses))->callback,
+            gpio_isr_handler_add(gpio_table[i].gpio_number, (gpio_isr_t)(void *)((const DIO_struct_t *)(gpio_table[i].gpio_uses))->callback,
                                  NULL);                                       // Add in the ISR handler
           }
           break;

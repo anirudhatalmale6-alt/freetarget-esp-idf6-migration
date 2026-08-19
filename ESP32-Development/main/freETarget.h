@@ -14,9 +14,12 @@
 #include "serial_io.h"
 #include "product.h"
 
+// TODO(IDF6): #undef added - see json.h.
 #ifdef FREETARGET_C
+#undef EXTERN
 #define EXTERN
 #else
+#undef EXTERN
 #define EXTERN extern
 #endif
 

@@ -9,6 +9,25 @@
 #define _GPIO_H_
 
 /*
+ * TODO(IDF6): these two includes were added during the 6.0 migration.
+ *
+ * board_assembly.h defines BUILD_REV and the REV_nnn constants used by the
+ * #if blocks further down this file. gpio.h did not include it, so any
+ * translation unit that reached gpio.h first saw BUILD_REV and REV_500 as
+ * undefined - and an undefined identifier in an #if is 0, so "BUILD_REV ==
+ * REV_500" read as "0 == 0" and BOTH pin-assignment blocks were compiled.
+ * That is where the "STOP_N redefined" errors come from.
+ *
+ * Behaviour is unchanged: the second block was already winning by virtue of
+ * being last, and BUILD_REV is 520, which is what that block is for. This
+ * just makes the header say what it means.
+ *
+ * driver/gpio.h supplies the GPIO_NUM_* constants those blocks expand to.
+ */
+#include "driver/gpio.h"
+#include "board_assembly.h"
+
+/*
  * Global functions
  */
 void         init_gpio(void);                              // Initialize the GPIO ports

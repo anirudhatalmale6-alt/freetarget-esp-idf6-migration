@@ -11,9 +11,14 @@
 /*
  * Variables
  */
-time_count_64_t NTP_time_us(void); // Coordinated time in us
-time_count_64_t NTP_time_ms(void); // Coordinated time in ms
-time_count_64_t NTP_time_s(void);  // Coordinated time in seconds
+// TODO(IDF6): return types were time_count_64_t, which is "typedef volatile
+// int64_t". A volatile qualifier on a RETURN type is meaningless - the
+// compiler discards it - and GCC 15 makes that -Werror=ignored-qualifiers.
+// Changed to int64_t. The typedef itself is untouched, so variables declared
+// time_count_64_t are still volatile, which is the part that matters.
+int64_t         NTP_time_us(void); // Coordinated time in us
+int64_t         NTP_time_ms(void); // Coordinated time in ms
+int64_t         NTP_time_s(void);  // Coordinated time in seconds
 
 /*
  * function Prototypes

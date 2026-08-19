@@ -11,10 +11,10 @@
  ******************************************************************************/
 
 #include "ctype.h"
-#include "driver\gpio.h"
+#include "driver/gpio.h"
 #include "esp_timer.h"
 #include "esp_random.h"
-#include "gpio_types.h"
+#include "hal/gpio_types.h"
 #include "serial_io.h"
 #include "stdbool.h"
 #include "stdio.h"
@@ -38,7 +38,7 @@
 #include "pwm.h"
 #include "timer.h"
 #include "bluetooth.h"
-#include "ota.h"
+#include "OTA.h"
 #include "calibrate.h"
 
 extern volatile time_count_t paper_time;
@@ -58,10 +58,19 @@ typedef struct
   void (*f)(void); // Function to execute the test
 } self_test_t;
 
+// TODO(IDF6): three entries below are cast to the table's function type.
+// factory_test(), sensor_test() and POST_counters() return bool, while the
+// table stores void (*)(void) and self_test() calls them ignoring any
+// return value - which is what has always happened. GCC 15 rejects both
+// the bare assignment (-Wincompatible-pointer-types) and a direct
+// function-pointer cast (-Werror=cast-function-type), so these go via
+// (void *), which is the usual way to keep it. No generated code changes.
+// If you would rather be rid of the casts, change those three to return
+// void - nothing in this table consumes the result.
 static const self_test_t test_list[] = {
     {"Help",                              &show_test_help            },
-    {"Factory test",                      &factory_test              },
-    {"Sensor test",                       &sensor_test               },
+    {"Factory test",                      (void (*)(void))(void *)&factory_test              },
+    {"Sensor test",                       (void (*)(void))(void *)&sensor_test               },
     {"- Digital",                         0                          },
     {"Digital inputs",                    &digital_test              },
     {"Advance paper backer",              &paper_test                },
@@ -79,7 +88,7 @@ static const self_test_t test_list[] = {
     {"PCNT Timers cleared",               &pcnt_4                    },
     {"PCNT test all",                     &pcnt_all                  },
     {"PCNT calibration",                  &pcnt_cal                  },
-    {"Sensor POST test",                  &POST_counters             },
+    {"Sensor POST test",                  (void (*)(void))(void *)&POST_counters             },
     {"Turn the oscillator on and off",    &timer_cycle_oscillator    },
     {"Turn the RUN lines on and off",     &timer_run_all             },
     {"Show the current time",             &show_time                 },

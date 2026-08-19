@@ -8,7 +8,9 @@
 #ifndef _TOKEN_H_
 #define _TOKEN_H_
 
+// TODO(IDF6): #undef added to the first branch too - see json.h.
 #ifdef TOKEN_C
+#undef EXTERN
 #define EXTERN
 #else
 #undef EXTERN

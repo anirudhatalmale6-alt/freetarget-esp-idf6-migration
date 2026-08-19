@@ -22,7 +22,7 @@
 #include "json.h"
 #include "timer.h"
 #include "serial_io.h"
-#include "wifi.h"
+#include "WiFi.h"
 #include "diag_tools.h"
 #include "http_client.h"
 #include "http_server.h"
@@ -116,7 +116,10 @@ void app_main(void)
   vTaskDelay(TICK_10ms);
   serial_flush(ALL);
 
-  target_name(&str_c);
+  // TODO(IDF6): was target_name(&str_c). str_c is already a char array, so
+  // & produced a char (*)[128] where a char * was wanted. Same address, so
+  // nothing changes at runtime.
+  target_name(str_c);
   DLT(DLT_INFO, SEND(ALL, sprintf(_xs, "SN:%d Name: %s Running\r\n", json_serial_number, str_c);))
   vTaskDelay(TICK_10ms);
   serial_flush(ALL);

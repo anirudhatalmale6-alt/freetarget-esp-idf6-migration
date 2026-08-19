@@ -110,6 +110,11 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt // Event being proces
                                                            /*
                                                             *  Switch to the event that got us here
                                                             */
+  // TODO(IDF6): a default: has been added at the bottom of this switch.
+  // ESP-IDF 6.0 added HTTP_EVENT_ON_STATUS_CODE and
+  // HTTP_EVENT_ON_HEADERS_COMPLETE to esp_http_client_event_id_t, and
+  // -Werror=switch requires every enumerator to be handled. The default
+  // ignores them, which is what happened before they existed.
   switch ( evt->event_id )
   {
     case HTTP_EVENT_ERROR:
@@ -211,6 +216,9 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt // Event being proces
       esp_http_client_set_header(evt->client, "Accept", "text/html");
       esp_http_client_set_redirection(evt->client);
       break;
+
+    default: // TODO(IDF6): HTTP_EVENT_ON_STATUS_CODE and
+      break;  // HTTP_EVENT_ON_HEADERS_COMPLETE, new in 6.0 - see above.
   }
   return ESP_OK;
 }

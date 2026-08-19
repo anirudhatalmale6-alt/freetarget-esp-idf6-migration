@@ -25,7 +25,7 @@ void          multifunction_init(void);          // Initialize the multifunction
 void          multifunction_switch(void);        // Handle the actions of the DIP Switch signal
 void          multifunction_switch_tick(void);   // Monitor the switches for long and short presses
 void          multifunction_wait_open(void);     // Wait for both multifunction switches to be open
-mfs_action_t *mfs_find(unsigned int action);     // Find the MFS entry corresponding to the index
+const mfs_action_t *mfs_find(unsigned int action); // TODO(IDF6): const - see mfs.c
 void          mfs_show(void);                    // Show the available settings
 void          mfs_RS485_control(bool direction); // Control RS485 direction
 

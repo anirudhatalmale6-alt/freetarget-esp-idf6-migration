@@ -21,7 +21,7 @@
 #include "nonvol.h"
 #include "serial_io.h"
 #include "calibrate.h"
-#include "ota.h"
+#include "OTA.h"
 #include "board_assembly.h"
 #include "analog_io.h"
 
@@ -445,7 +445,17 @@ void nonvol_write_i32(char *name, int *value) // Name of the value to write
 {
   DLT(DLT_DEBUG, SEND(CONSOLE, sprintf(_xs, "nonvol_write(%s)\r\n", name);))
 
-  if ( nvs_set_i32(my_handle, name, value) != ESP_OK )
+  // TODO(IDF6): *** PLEASE LOOK AT THIS ONE *** - was
+  //   nvs_set_i32(my_handle, name, value)
+  // nvs_set_i32() takes an int32_t VALUE, but value is an int *. As written
+  // what went into NVS was the ADDRESS of the variable, not its contents.
+  // GCC 15 makes this an error ("makes integer from pointer without a
+  // cast"); it used to be a warning. Dereferenced, which matches the
+  // function name and signature - but it is a genuine bug rather than a 6.0
+  // rename, so please confirm. Note that anything previously written
+  // through this path is meaningless, so a factory reset may be in order.
+  // The identical bug was in your Trace package.
+  if ( nvs_set_i32(my_handle, name, *value) != ESP_OK )
   {
     DLT(DLT_CRITICAL, SEND(CONSOLE, sprintf(_xs, "Failed to write %s to NONVOL", name);))
   }

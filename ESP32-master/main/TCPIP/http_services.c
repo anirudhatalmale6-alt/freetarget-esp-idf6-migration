@@ -389,7 +389,11 @@ static esp_err_t service_get_menu(httpd_req_t *req)
    */
   target_name(my_name);                                 // Get the target name
   httpd_resp_set_hdr(req, "get_menu", my_name);
-  http_printf(&menu_html_start, req, SIZEOF_menu_HTML); // point to the target HTML file
+  // TODO(IDF6): was http_printf(&menu_html_start, ...). menu_html_start is
+  // declared const unsigned char[] by the EMBED_FILES machinery, so & gave a
+  // pointer to array, and the element type is unsigned char against the
+  // const char * the function wants. Same address either way.
+  http_printf((const char *)menu_html_start, req, SIZEOF_menu_HTML); // point to the target HTML file
 
   return ESP_OK;
 }
@@ -487,7 +491,9 @@ static esp_err_t service_get_json(httpd_req_t *req)
   /*
    * Set the header to indicate that this is a json request, then wait till it's done
    */
-  target_name(&my_name);       // Get the target name
+  // TODO(IDF6): was target_name(&my_name) - every other call site in this
+  // file passes my_name directly. See main.c.
+  target_name(my_name);        // Get the target name
   httpd_resp_set_hdr(req, "get_json", my_name);
   http_send_string_start(req); // Start sending a string to the client
   do
@@ -495,7 +501,11 @@ static esp_err_t service_get_json(httpd_req_t *req)
     vTaskDelay(ONE_SECOND);    // Give up time for the data to be processed
   } while ( (run_state & IN_HTTP) == IN_HTTP ); // Wait until the queue is not full
 
-  http_send_string_end(); // Stop sending a string to the client
+  // TODO(IDF6): was http_send_string_end(). The definition in http_server.c
+  // has always taken a httpd_req_t *; only the prototype said otherwise, and
+  // under C23 an empty parameter list means (void) so the mismatch is now
+  // caught. req is the request being serviced here.
+  http_send_string_end(req); // Stop sending a string to the client
 
   /*
    * All done, return

@@ -27,10 +27,10 @@
 #include "stdio.h"
 #include "token.h"
 #include "serial_io.h"
-#include "wifi.h"
+#include "WiFi.h"
 #include "bluetooth.h"
 #include "timer.h"
-#include "ota.h"
+#include "OTA.h"
 #include "calibrate.h"
 #include "NTP.h"
 
@@ -54,24 +54,39 @@ static void set_50m(int x);                                                    /
  */
 char                   input_JSON[EXTRA_LARGE_STRING]; // JSON input buffer
 extern time_count_64_t NTP_server_time;                // Time in the server
+/*
+ * TODO(IDF6): explicit casts added in the value and service-function
+ * columns below.
+ *
+ * This table deliberately stores several different types in two generic
+ * columns - json_message_t declares them as  int *value  and
+ * void (*f)(int x). Rows holding real_t*, int(*)[128], char(*)[128], or
+ * service functions taking void/unsigned int have never actually matched
+ * those declared types. Some rows were already cast; most were not.
+ *
+ * GCC 15 makes the mismatch -Werror=incompatible-pointer-types, so the
+ * remainder are now cast the same way. Function pointers route via (void *)
+ * because a direct cast trips -Werror=cast-function-type. The table is byte
+ * for byte what it was before and no generated code changes.
+ */
 const json_message_t   JSON[] = {
     //  show     token        value stored in RAM             convert                 service fcn()     NONVOL location      Initial Value
     //  PS Value
     {HIDE,        "\"50M\"",             0,                           IS_VOID,                &set_50m,           0,                          0,          0 },
     {HIDE + LOCK, "\"ANGLE\":",          &json_sensor_angle,          IS_INT32,               0,                  NONVOL_SENSOR_ANGLE,        45,         0 },
-    {HIDE + LOCK, "\"ANGLE_OFFSET\":",   &json_sensor_angle_offset,   IS_FLOAT,               0,                  NONVOL_SENSOR_ANGLE_OFFSET, 0,          15},
+    {HIDE + LOCK, "\"ANGLE_OFFSET\":",   (int *)&json_sensor_angle_offset,   IS_FLOAT,               0,                  NONVOL_SENSOR_ANGLE_OFFSET, 0,          15},
     {SHOW + LOCK, "\"AUX_MODE\":",       &json_aux_mode,              IS_INT32,               0,                  NONVOL_AUX_PORT_ENABLE,     RS485,      6 },
-    {HIDE,        "\"BYE\"",             0,                           IS_INT32,               &bye,               0,                          0,          0 },
+    {HIDE,        "\"BYE\"",             0,                           IS_INT32,               (void (*)(int))(void *)&bye,               0,                          0,          0 },
     {HIDE,        "\"CAL\":",            0,                           IS_INT32,               &calibrate,         0,                          0,          0 },
-    {HIDE,        "\"DOWNLOAD\"",        &json_OTA_download_size,     IS_INT32,               &OTA_serial,        0,                          0,          0 },
-    {HIDE,        "\"ECHO\"",            0,                           IS_VOID,                &show_echo,         0,                          0,          0 },
+    {HIDE,        "\"DOWNLOAD\"",        &json_OTA_download_size,     IS_INT32,               (void (*)(int))(void *)&OTA_serial,        0,                          0,          0 },
+    {HIDE,        "\"ECHO\"",            0,                           IS_VOID,                (void (*)(int))(void *)&show_echo,         0,                          0,          0 },
     {HIDE + LOCK, "\"FACE_STRIKE\":",    &json_face_strike,           IS_INT32,               0,                  NONVOL_FACE_STRIKE,         0,          0 },
-    {HIDE,        "\"FLASH\"",           0,                           IS_INT32,               &OTA_serial,        0,                          0,          0 },
+    {HIDE,        "\"FLASH\"",           0,                           IS_INT32,               (void (*)(int))(void *)&OTA_serial,        0,                          0,          0 },
     {SHOW + LOCK, "\"FOLLOW_THROUGH\":", &json_follow_through,        IS_INT32,               0,                  NONVOL_FOLLOW_THROUGH,      0,          0 },
     {HIDE + LOCK, "\"INIT\"",            0,                           IS_VOID,                &init_nonvol,       0,                          0,          0 },
     {SHOW + LOCK, "\"KEEP_ALIVE\":",     &json_keep_alive,            IS_INT32,               0,                  NONVOL_KEEP_ALIVE,          120,        0 },
     {SHOW + LOCK, "\"LED_BRIGHT\":",     &json_LED_PWM,               IS_INT32,               &set_LED_PWM_now,   NONVOL_LED_PWM,             50,         0 },
-    {HIDE,        "\"MFS?\"",            0,                           IS_VOID,                &mfs_show,          0,                          0,          0 },
+    {HIDE,        "\"MFS?\"",            0,                           IS_VOID,                (void (*)(int))(void *)&mfs_show,          0,                          0,          0 },
     {SHOW + LOCK, "\"MFS_TAP_1\":",      &json_mfs_tap_1,             IS_MFS,                 0,                  NONVOL_MFS_TAP_A,           PAPER_SHOT, 2 },
     {SHOW + LOCK, "\"MFS_TAP_2\":",      &json_mfs_tap_2,             IS_MFS,                 0,                  NONVOL_MFS_TAP_B,           TARGET_ON,  2 },
     {SHOW + LOCK, "\"MFS_HOLD_1\":",     &json_mfs_hold_1,            IS_MFS,                 0,                  NONVOL_MFS_HOLD_A,          PAPER_FEED, 2 },
@@ -85,7 +100,7 @@ const json_message_t   JSON[] = {
     {SHOW + LOCK, "\"NAME_TEXT\":",      (int *)&json_name_text,      IS_TEXT + SSID_SIZE,    &show_names,        NONVOL_NAME_TEXT,           0,          8 },
     {HIDE + LOCK, "\"OTA\"",             0,                           0,                      &OTA_load_json,     0,                          0,          0 },
     {SHOW + LOCK, "\"OTA_URL\":",        (int *)&json_ota_url,        IS_TEXT + URL_SIZE,     0,                  NONVOL_OTA_URL,             0,          11},
-    {HIDE,        "\"P\"",               0,                           IS_VOID,                &paper_start,       0,                          0,          0 },
+    {HIDE,        "\"P\"",               0,                           IS_VOID,                (void (*)(int))(void *)&paper_start,       0,                          0,          0 },
     {SHOW + LOCK, "\"PAPER_ECO\":",      &json_paper_eco,             IS_INT32,               0,                  NONVOL_PAPER_ECO,           0,          0 },
     {SHOW + LOCK, "\"PAPER_SHOT\":",     &json_paper_shot,            IS_INT32,               0,                  NONVOL_PAPER_SHOT,          0,          5 },
     {SHOW + LOCK, "\"PAPER_TIME\":",     &json_paper_time,            IS_INT32,               0,                  NONVOL_PAPER_TIME,          500,        0 },
@@ -93,12 +108,12 @@ const json_message_t   JSON[] = {
     {SHOW + LOCK, "\"POWER_SAVE\":",     &json_power_save,            IS_INT32,               0,                  NONVOL_POWER_SAVE,          0,          0 },
     {SHOW,        "\"RAPID_COUNT\":",    &json_rapid_count,           IS_INT32,               0,                  0,                          0,          0 },
     {SHOW,        "\"RAPID_ENABLE\":",   &json_rapid_enable,          IS_INT32,               0,                  0,                          0,          0 },
-    {SHOW,        "\"RAPID_TIME\":",     &json_rapid_time,            IS_FLOAT,               0,                  0,                          0,          0 },
-    {SHOW,        "\"RAPID_WAIT\":",     &json_rapid_wait,            IS_FLOAT,               0,                  0,                          0,          0 },
-    {SHOW + LOCK, "\"REMOTE_ACTIVE\":",  &json_remote_active,         IS_INT32,               0,                  NONVOL_REMOTE_ACTIVE,       0,          8 },
-    {SHOW + LOCK, "\"REMOTE_KEY\":",     &json_remote_key,            IS_TEXT + KEY_SIZE,     0,                  NONVOL_REMOTE_KEY,          0,          8 },
+    {SHOW,        "\"RAPID_TIME\":",     (int *)&json_rapid_time,            IS_FLOAT,               0,                  0,                          0,          0 },
+    {SHOW,        "\"RAPID_WAIT\":",     (int *)&json_rapid_wait,            IS_FLOAT,               0,                  0,                          0,          0 },
+    {SHOW + LOCK, "\"REMOTE_ACTIVE\":",  (int *)&json_remote_active,         IS_INT32,               0,                  NONVOL_REMOTE_ACTIVE,       0,          8 },
+    {SHOW + LOCK, "\"REMOTE_KEY\":",     (int *)&json_remote_key,            IS_TEXT + KEY_SIZE,     0,                  NONVOL_REMOTE_KEY,          0,          8 },
     {SHOW + LOCK, "\"REMOTE_URL\":",     (int *)&json_remote_url,     IS_TEXT + URL_SIZE,     0,                  NONVOL_REMOTE_URL,          0,          8 },
-    {HIDE,        "\"RESET\"",           0,                           IS_VOID,                &esp_restart,       0,                          0,          0 },
+    {HIDE,        "\"RESET\"",           0,                           IS_VOID,                (void (*)(int))(void *)&esp_restart,       0,                          0,          0 },
     {SHOW + LOCK, "\"SEND_MISS\":",      &json_send_miss,             IS_INT32,               0,                  NONVOL_SEND_MISS,           0,          0 },
     {SHOW + LOCK, "\"SENSOR\":",         (int *)&json_sensor_dia,     IS_FLOAT,               0,                  NONVOL_SENSOR_DIA,          232000,     0 },
     {SHOW,        "\"SN\":",             &json_serial_number,         IS_FIXED,               0,                  NONVOL_SERIAL_NO,           0xffff,     0 },
@@ -108,12 +123,12 @@ const json_message_t   JSON[] = {
     {SHOW,        "\"STEP_START\":",     &json_step_start,            IS_INT32,               0,                  NONVOL_STEP_START,          0,          4 },
     {SHOW + LOCK, "\"STEP_TIME\":",      &json_step_time,             IS_INT32,               0,                  NONVOL_STEP_TIME,           0,          0 },
     {HIDE,        "\"TARGET_TYPE\":",    &json_target_type,           IS_INT32,               0,                  NONVOL_TARGET_TYPE,         0,          0 },
-    {HIDE + LOCK, "\"TEST\":",           0,                           IS_INT32,               &self_test,         0,                          0,          0 },
+    {HIDE + LOCK, "\"TEST\":",           0,                           IS_INT32,               (void (*)(int))(void *)&self_test,         0,                          0,          0 },
     {SHOW + LOCK, "\"TOKEN\":",          &json_token,                 IS_INT32,               0,                  NONVOL_TOKEN,               0,          0 },
     {SHOW,        "\"TRACE\":",          0,                           IS_INT32,               &set_trace,         0,                          0,          0 },
-    {SHOW,        "\"VERSION\"",         0,                           IS_INT32,               &POST_version,      0,                          0,          0 },
-    {SHOW + LOCK, "\"VREF_LO\":",        (int *)&json_vref_lo,        IS_FLOAT,               &set_VREF,          NONVOL_VREF_LO,             1250,       0 },
-    {SHOW + LOCK, "\"VREF_HI\":",        (int *)&json_vref_hi,        IS_FLOAT,               &set_VREF,          NONVOL_VREF_HI,             2000,       0 },
+    {SHOW,        "\"VERSION\"",         0,                           IS_INT32,               (void (*)(int))(void *)&POST_version,      0,                          0,          0 },
+    {SHOW + LOCK, "\"VREF_LO\":",        (int *)&json_vref_lo,        IS_FLOAT,               (void (*)(int))(void *)&set_VREF,          NONVOL_VREF_LO,             1250,       0 },
+    {SHOW + LOCK, "\"VREF_HI\":",        (int *)&json_vref_hi,        IS_FLOAT,               (void (*)(int))(void *)&set_VREF,          NONVOL_VREF_HI,             2000,       0 },
     {SHOW + LOCK, "\"WIFI_CHANNEL\":",   &json_wifi_channel,          IS_INT32,               0,                  NONVOL_WIFI_CHANNEL,        6,          0 },
     {SHOW + LOCK, "\"WIFI_GATEWAY\":",   (int *)&json_wifi_gateway,   IS_TEXT + IP_SIZE,      0,                  NONVOL_WIFI_GATEWAY,        0,          9 },
     {SHOW + LOCK, "\"WIFI_HIDDEN\":",    &json_wifi_hidden,           IS_INT32,               0,                  NONVOL_WIFI_HIDDEN,         0,          1 },
@@ -135,8 +150,8 @@ const json_message_t   JSON[] = {
     {SHOW,        "\"ATHLETE\":",        (int *)&json_athlete,        IS_TEXT + LARGE_STRING, 0,                  NONVOL_ATHELETE,            0,          10},
     {SHOW,        "\"EVENT\":",          (int *)&json_event,          IS_TEXT + LARGE_STRING, 0,                  NONVOL_EVENT,               0,          10},
     {SHOW,        "\"TARGET_NAME\":",    (int *)json_target_name,     IS_TEXT + LARGE_STRING, 0,                  NONVOL_TARGET_NAME,         0,          10},
-    {HIDE,        "\"LOCK\":",           0,                           IS_INT32,               &lock_target,       0,                          0,          12},
-    {HIDE,        "\"UNLOCK\":",         0,                           IS_INT32,               &unlock_target,     0,                          0,          12},
+    {HIDE,        "\"LOCK\":",           0,                           IS_INT32,               (void (*)(int))(void *)&lock_target,       0,                          0,          12},
+    {HIDE,        "\"UNLOCK\":",         0,                           IS_INT32,               (void (*)(int))(void *)&unlock_target,     0,                          0,          12},
     {0,           0,                     0,                           0,                      0,                  0,                          0,          0 }
 };
 
@@ -265,12 +280,15 @@ void freeETarget_json(void *pvParameters)
           {
             Bluetooth_start_new_connection();
           }
+          __attribute__((fallthrough)); // TODO(IDF6): deliberate
 
         case '^':                     // Special case for European keyboards which have a different "*" key
           ch = '"';                   // Convert and fall through
+          __attribute__((fallthrough)); // TODO(IDF6): deliberate, as the comment says
 
         case '"':                     // Start or end of text
           keep_space = (keep_space ^ 1) & 1;
+          __attribute__((fallthrough)); // TODO(IDF6): deliberate
 
         default:
           if ( (ch != ' ') || keep_space )
@@ -486,7 +504,7 @@ void show_echo(void)
 {
   int                    i, j;
   char                   str_c[32]; // String holding buffers
-  mfs_action_t          *mfs_ptr;
+  const mfs_action_t    *mfs_ptr; // TODO(IDF6): const - mfs_find() returns a pointer into a const table
   unsigned int           dip;
   char                  *ABCD[]            = {"A", "B", "C", "D"};
   const esp_partition_t *running_partition = esp_ota_get_running_partition();
@@ -623,7 +641,10 @@ void show_echo(void)
   SEND(ALL, sprintf(_xs, "New OTA:              %s", new_app_version);)
 #endif
 
-  nvs_get_i32(my_handle, NONVOL_PS_VERSION, &j);
+  // TODO(IDF6): cast added. nvs_get_i32() wants an int32_t *, and j is an
+  // int. On this target int32_t is "long int" - same width, different type
+  // as far as C is concerned, so the pointers are incompatible.
+  nvs_get_i32(my_handle, NONVOL_PS_VERSION, (int32_t *)&j);
   SEND(ALL, sprintf(_xs, "\"PS_VERSION\":        %d,", j);)                                           // Current persistent storage version
   SEND(ALL, sprintf(_xs, "\"BD_REV\":            %d.%d.%d", (revision() / 100), ((revision() % 100) / 10),
                     (revision() % 10));)                                                              // Current board version

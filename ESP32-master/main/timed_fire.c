@@ -6,7 +6,7 @@
  *
  *-------------------------------------------------------------*/
 #include "esp_timer.h"
-#include "driver\gpio.h"
+#include "driver/gpio.h"
 #include "stdio.h"
 
 #include "freETarget.h"
@@ -55,7 +55,10 @@ typedef struct
 typedef struct
 {
   char          *event;       // What event are we shooting
-  rapid_state_t *rapid_state; // State machine for this event
+  // TODO(IDF6): const added. rapid_state_ISSF[], rapid_state_sport[] and
+  // tabata_rapid_state[] are all declared const, so storing them here as a
+  // non-const pointer discarded the qualifier. Read only in timed_fire().
+  const rapid_state_t *rapid_state; // State machine for this event
   void (*start_up)(void);     // Function to call to start the relay
   char score_mode;            // What score mode to use for this event
 } course_of_fire_t;
@@ -73,7 +76,7 @@ static int    always_true = 0;             // Force exit condition to be true (t
 
 static real_t         adjusted_rapid_wait; // Time interval removing grace period
 static int            cycle_count;         // How many have we received
-static rapid_state_t *rapid_state = NULL;  // What state table to use
+static const rapid_state_t *rapid_state = NULL; // TODO(IDF6): const - it points into the const course_of_fire[] tables
 static unsigned int   rapid_index;         // Index of the current state
 static int            last_enable = 0;
 static char           score_mode;          // What score mode are we in?
@@ -159,9 +162,12 @@ static void start_tabata(void)
  * Course of fire definitions
  */
 const course_of_fire_t course_of_fire[] = {
-    {"RFP", &rapid_state_ISSF,   &start_rapid_fire,   'E'}, // Rapid fire pistol
-    {"SPP", &rapid_state_sport,  &start_sport_pistol, 'D'}, // Sport pistol
-    {"TBT", &tabata_rapid_state, &start_tabata,       'D'}, // Tabata training
+    // TODO(IDF6): the & has been dropped from the three state machines.
+    // They are arrays, so &rapid_state_ISSF was a rapid_state_t (*)[7] where
+    // a rapid_state_t * was wanted. Same address, no behaviour change.
+    {"RFP", rapid_state_ISSF,   &start_rapid_fire,   'E'}, // Rapid fire pistol
+    {"SPP", rapid_state_sport,  &start_sport_pistol, 'D'}, // Sport pistol
+    {"TBT", tabata_rapid_state, &start_tabata,       'D'}, // Tabata training
     {NULL,  0,                   0,                   0  }
 };
 

@@ -99,7 +99,8 @@ void http_DNS_test(void)
   }
   else
   {
-    WiFi_remote_IP_address(&str_c);
+    // TODO(IDF6): was WiFi_remote_IP_address(&str_c) - see main.c.
+    WiFi_remote_IP_address(str_c);
     SEND(ALL, sprintf(_xs, "\r\nThe IP address of %s is %s", test_URL, str_c);)
   }
 

@@ -40,9 +40,14 @@ extern const json_message_t JSON[];
 /*
  * Definitioins
  */
+// TODO(IDF6): #undef added. Several headers in this project define EXTERN,
+// so whichever is included second redefines it. That was always a warning;
+// GCC 15 with -Werror makes it fatal. Behaviour is unchanged.
 #ifdef JSON_C
+#undef EXTERN
 #define EXTERN
 #else
+#undef EXTERN
 #define EXTERN extern
 extern const json_message_t JSON[];
 extern char                 input_JSON[];

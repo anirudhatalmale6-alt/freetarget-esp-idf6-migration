@@ -6,12 +6,12 @@
  *
  *-------------------------------------------------------------*/
 #include "esp_timer.h"
-#include "driver\gpio.h"
+#include "driver/gpio.h"
 #include "esp_random.h"
 #include "stdio.h"
 #include "math.h"
 #include "nvs.h"
-#include "mpu_wrappers.h"
+#include "freertos/mpu_wrappers.h"
 #include "assert.h"
 #include "esp_http_server.h"
 #include "esp_event.h"
@@ -762,8 +762,26 @@ sensor_ID_t *find_sensor(unsigned int run_mask // Run mask to look for a match
 
   /*
    * Not found, return null
+   *
+   * TODO(IDF6): *** PLEASE LOOK AT THIS ONE ***
+   *
+   * The comment says "return null" but the code returns LED_READY, which is
+   * the string "g----" from diag_tools.h. find_sensor() returns
+   * sensor_ID_t *, so this hands back a pointer to a 6 byte string constant
+   * where the caller expects a sensor record. GCC 15 makes it an error.
+   *
+   * I have NOT changed it to NULL, deliberately. Every call site
+   * dereferences the result immediately without a NULL check -
+   * find_sensor(1 << i)->long_name and similar - so returning NULL would
+   * turn a silent wrong answer into a crash. Today the fall-through reads
+   * garbage out of a string constant, which is wrong but survivable.
+   *
+   * The cast below keeps the existing behaviour exactly. The real fix is
+   * either to return NULL and add checks at the call sites, or to return a
+   * static "unknown sensor" record. Your call - it is a behaviour change
+   * either way. Same in your master package.
    */
-  return LED_READY;
+  return (sensor_ID_t *)LED_READY;
 }
 /*----------------------------------------------------------------
  *

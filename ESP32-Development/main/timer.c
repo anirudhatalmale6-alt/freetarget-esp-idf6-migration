@@ -16,12 +16,16 @@
 
 #include "stdbool.h"
 #include "esp_timer.h"
-#include "driver\timer.h"
+// TODO(IDF6): was #include "driver/timer.h". The legacy timer group driver
+// was deprecated in 5.x (it lived under components/driver/deprecated/) and is
+// DELETED in ESP-IDF 6.0 - there is no header and no compatibility shim.
+// Ported to the gptimer API below; see freeETarget_timer_init().
+#include "driver/gptimer.h"
 
 #include "freETarget.h"
 #include "helpers.h"
 #include "diag_tools.h"
-#include "gpio_types.h"
+#include "hal/gpio_types.h"
 #include "json.h"
 #include "serial_io.h"
 #include "mfs.h"
@@ -78,7 +82,11 @@ static synchronous_task_t task_list[] = {
     {BAND_10ms,   paper_drive_tick         }, // Drive the paper drive motor
     {BAND_100ms,  timed_event_task         }, // Manage the rapid fire timer
     {BAND_500ms,  toggle_status_LEDs       }, // Blink the LEDs
-    {BAND_1000ms, check_12V                }, // Monitor the 12V supply
+    // TODO(IDF6): cast added - check_12V() returns bool while the table
+    // stores void (*)(void), and the scheduler ignores the result. Routed
+    // via (void *) because a direct function-pointer cast trips
+    // -Werror=cast-function-type. No generated code changes.
+    {BAND_1000ms, (void (*)(void))(void *)check_12V}, // Monitor the 12V supply
     {BAND_1000ms, check_new_connection     }, // Check for a new WiFi connection
     {BAND_60s,    watchdog                 }, // Watchdog monitor
     {0,           0                        }
@@ -87,7 +95,17 @@ static synchronous_task_t task_list[] = {
 /*
  *  Function Prototypes
  */
-static bool IRAM_ATTR freeETarget_timer_isr_callback(void *args);
+// TODO(IDF6): gptimer hands the callback three arguments where the legacy
+// timer group driver passed only the user context. The return value means
+// the same thing in both - "did we wake a higher priority task".
+//
+// IRAM_ATTR is intentionally NOT repeated here. It expands to a section
+// attribute built from __COUNTER__, so putting it on both the declaration
+// and the definition asks for .iram1.0 and .iram1.1 on the same function,
+// which GCC 15 rejects (-Werror=attributes). The definition keeps it, so the
+// ISR still lives in IRAM.
+static bool freeETarget_timer_isr_callback(gptimer_handle_t timer, const gptimer_alarm_event_data_t *edata,
+                                           void *args);
 
 /*-----------------------------------------------------
  *
@@ -112,24 +130,66 @@ static bool IRAM_ATTR freeETarget_timer_isr_callback(void *args);
 #define TIMER_SCALE   (1000 / TIMER_DIVIDER) // convert counter value to seconds
 #define ONE_MS        (80 * TIMER_SCALE)     // 1 ms timer interrupt
 
-const timer_config_t config = {
-    .clk_src     = RMT_CLK_SRC_APB,
-    .divider     = TIMER_DIVIDER,
-    .counter_dir = TIMER_COUNT_UP,
-    .counter_en  = TIMER_PAUSE,
-    .alarm_en    = TIMER_ALARM_EN,
-    .auto_reload = 1,
-}; // default clock source is APB
+/*
+ * TODO(IDF6): ported from the legacy timer group driver to gptimer.
+ *
+ * The old configuration was:
+ *
+ *   const timer_config_t config = {
+ *       .clk_src     = RMT_CLK_SRC_APB,
+ *       .divider     = TIMER_DIVIDER,      // 16
+ *       .counter_dir = TIMER_COUNT_UP,
+ *       .counter_en  = TIMER_PAUSE,
+ *       .alarm_en    = TIMER_ALARM_EN,
+ *       .auto_reload = 1,
+ *   };
+ *
+ * with timer_init / timer_set_alarm_value / timer_isr_callback_add /
+ * timer_start on TIMER_GROUP_0, TIMER_1.
+ *
+ * The timing is reproduced exactly rather than tidied up:
+ *
+ *   APB is 80 MHz, divider 16, so the counter ticked at 5 MHz.
+ *   gptimer takes the tick rate directly, hence resolution_hz = 5 000 000.
+ *
+ *   The old alarm value was ONE_MS = 80 * (1000/16) = 80 * 62 = 4960 counts.
+ *   At 5 MHz that is 992 us, not 1000 us - the integer division in
+ *   TIMER_SCALE truncates 62.5 to 62. So the "1 ms" tick has always run
+ *   about 0.8 percent fast. I have kept 4960 because everything downstream
+ *   is calibrated against the tick you actually have. If you want a true
+ *   millisecond, set the alarm to 5000 - but that shifts every timer in the
+ *   system by 0.8 percent, so treat it as a deliberate change.
+ *
+ *   auto_reload_on_alarm matches .auto_reload = 1.
+ *   The counter is left at 0 on reload, matching timer_set_counter_value(0).
+ */
+static gptimer_handle_t freeETarget_timer_handle = NULL;
 
 void freeETarget_timer_init(void)
 {
   DLT(DLT_INFO, SEND(CONSOLE, sprintf(_xs, "freeETarget_timer_init()");))
-  timer_init(TIMER_GROUP_0, TIMER_1, &config);
-  timer_set_counter_value(TIMER_GROUP_0, TIMER_1, 0);    // Start the timer at 0
-  timer_set_alarm_value(TIMER_GROUP_0, TIMER_1, ONE_MS); // Trigger on this value
-  timer_enable_intr(TIMER_GROUP_0, TIMER_1);             // Interrupt associated with this interrupt
-  timer_isr_callback_add(TIMER_GROUP_0, TIMER_1, freeETarget_timer_isr_callback, NULL, 0);
-  timer_start(TIMER_GROUP_0, TIMER_1);
+
+  gptimer_config_t config = {
+      .clk_src       = GPTIMER_CLK_SRC_DEFAULT,
+      .direction     = GPTIMER_COUNT_UP,
+      .resolution_hz = 5 * 1000 * 1000, // 80 MHz APB / 16, as per TIMER_DIVIDER
+  };
+  ESP_ERROR_CHECK(gptimer_new_timer(&config, &freeETarget_timer_handle));
+
+  gptimer_alarm_config_t alarm_config = {
+      .alarm_count                = ONE_MS, // 4960 counts at 5 MHz - see note above
+      .reload_count               = 0,      // was timer_set_counter_value(..., 0)
+      .flags.auto_reload_on_alarm = true,   // was .auto_reload = 1
+  };
+  ESP_ERROR_CHECK(gptimer_set_alarm_action(freeETarget_timer_handle, &alarm_config));
+
+  gptimer_event_callbacks_t callbacks = {
+      .on_alarm = freeETarget_timer_isr_callback,
+  };
+  ESP_ERROR_CHECK(gptimer_register_event_callbacks(freeETarget_timer_handle, &callbacks, NULL));
+
+  ESP_ERROR_CHECK(gptimer_enable(freeETarget_timer_handle));
+  ESP_ERROR_CHECK(gptimer_start(freeETarget_timer_handle));
 
   /*
    *  Timer running. return
@@ -139,13 +199,19 @@ void freeETarget_timer_init(void)
 
 void freeETarget_timer_pause(void) // Stop the timer
 {
-  timer_pause(TIMER_GROUP_0, TIMER_1);
+  if ( freeETarget_timer_handle != NULL )
+  {
+    gptimer_stop(freeETarget_timer_handle);
+  }
   return;
 }
 
 void freeETarget_timer_start(void) // Start the timer
 {
-  timer_start(TIMER_GROUP_0, TIMER_1);
+  if ( freeETarget_timer_handle != NULL )
+  {
+    gptimer_start(freeETarget_timer_handle);
+  }
   return;
 }
 
@@ -198,8 +264,15 @@ void show_timers(void) // Show the current timers
  *
  *
  *-----------------------------------------------------*/
-static bool IRAM_ATTR freeETarget_timer_isr_callback(void *args)
+// TODO(IDF6): signature changed for gptimer - see the forward declaration.
+// The body is untouched.
+static bool IRAM_ATTR freeETarget_timer_isr_callback(gptimer_handle_t timer, const gptimer_alarm_event_data_t *edata,
+                                                     void *args)
 {
+  (void)timer;
+  (void)edata;
+  (void)args;
+
   BaseType_t   high_task_awoken = pdFALSE;
   unsigned int pin;                                       // Value read from the port
 
@@ -390,7 +463,7 @@ void freeETarget_synchronous(void *pvParameters)
  *-----------------------------------------------------*/
 int ft_timer_new(time_count_t *new_timer, // Pointer to new down counter
                  time_count_t  duration,  // Duration of the timer
-                 void *(callback)(),      // What to do when we hit zero
+                 void (*callback)(void),  // TODO(IDF6): was void *(callback)() - see timer.h
                  char *name               // Timer name
 )
 {
@@ -486,12 +559,12 @@ void show_time(void)
  * *
  *------------------------------------------------------*/
 
-time_count_t run_time_seconds(void)
+int32_t run_time_seconds(void) // TODO(IDF6): was time_count_t (volatile) - see timer.h
 {
   return (esp_timer_get_time() - base_time) / 1000000;
 }
 
-time_count_t run_time_ms(void)
+int32_t run_time_ms(void) // TODO(IDF6): was time_count_t (volatile) - see timer.h
 {
   return (esp_timer_get_time() - base_time) / 1000;
 }

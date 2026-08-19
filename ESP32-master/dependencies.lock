@@ -1,12 +1,145 @@
 dependencies:
-  espressif/led_strip:
-    dependencies: []
+  espressif/ethernet_init:
+    component_hash: 6268f857d06a1c414d38d38d74632e0d94074f8f653106bfa4a1d475a74f8fe0
+    dependencies:
+    - matches:
+      - if: $CONFIG{ETHERNET_SPI_USE_CH390} == 1
+      name: espressif/ch390
+      registry_url: https://components.espressif.com
+      require: private
+      version: ^0.4.0
+    - matches:
+      - if: $CONFIG{ETHERNET_SPI_USE_DM9051} == 1
+      name: espressif/dm9051
+      registry_url: https://components.espressif.com
+      require: private
+      rules:
+      - if: idf_version >=6.0
+        version: ^1.0.0
+      version: '*'
+    - matches:
+      - if: idf_version >=6.0
+        version: ^1.0.0
+      name: espressif/dp83848
+      registry_url: https://components.espressif.com
+      require: private
+      rules:
+      - if: $CONFIG{ETHERNET_SOC_EMAC_SUPPORTED} == 1
+      - if: $CONFIG{ETHERNET_PHY_USE_DP83848} == 1
+      version: '*'
+    - matches:
+      - if: $CONFIG{ETHERNET_SPI_USE_ENC28J60} == 1
+      name: espressif/enc28j60
+      registry_url: https://components.espressif.com
+      require: private
+      version: ^1.0.0
+    - matches:
+      - if: idf_version >=6.0
+        version: ^1.0.0
+      name: espressif/ip101
+      registry_url: https://components.espressif.com
+      require: private
+      rules:
+      - if: $CONFIG{ETHERNET_SOC_EMAC_SUPPORTED} == 1
+      - if: $CONFIG{ETHERNET_PHY_USE_IP101} == 1
+      version: '*'
+    - matches:
+      - if: idf_version >=6.0
+        version: ^1.0.0
+      name: espressif/ksz80xx
+      registry_url: https://components.espressif.com
+      require: private
+      rules:
+      - if: $CONFIG{ETHERNET_SOC_EMAC_SUPPORTED} == 1
+      - if: $CONFIG{ETHERNET_PHY_USE_KSZ80XX} == 1
+      version: '*'
+    - matches:
+      - if: $CONFIG{ETHERNET_SPI_USE_KSZ8851SNL} == 1
+      name: espressif/ksz8851snl
+      registry_url: https://components.espressif.com
+      require: private
+      rules:
+      - if: idf_version >=6.0
+        version: ^1.0.0
+      version: '*'
+    - matches:
+      - if: $CONFIG{ETHERNET_SPI_USE_LAN865X} == 1
+      name: espressif/lan865x
+      registry_url: https://components.espressif.com
+      require: private
+      version: ^0.2.0
+    - name: espressif/lan867x
+      registry_url: https://components.espressif.com
+      require: private
+      rules:
+      - if: $CONFIG{ETHERNET_SOC_EMAC_SUPPORTED} == 1
+      - if: $CONFIG{ETHERNET_PHY_USE_LAN867X} == 1
+      version: ^2.0.0
+    - matches:
+      - if: idf_version >=6.0
+        version: ^1.0.0
+      name: espressif/lan87xx
+      registry_url: https://components.espressif.com
+      require: private
+      rules:
+      - if: $CONFIG{ETHERNET_SOC_EMAC_SUPPORTED} == 1
+      - if: $CONFIG{ETHERNET_PHY_USE_LAN87XX} == 1
+      version: '*'
+    - matches:
+      - if: idf_version >=6.0
+        version: ^1.0.0
+      name: espressif/rtl8201
+      registry_url: https://components.espressif.com
+      require: private
+      rules:
+      - if: $CONFIG{ETHERNET_SOC_EMAC_SUPPORTED} == 1
+      - if: $CONFIG{ETHERNET_PHY_USE_RTL8201} == 1
+      version: '*'
+    - matches:
+      - if: idf_version >=6.1
+        version: ^0.2.0
+      name: espressif/vsc8541
+      registry_url: https://components.espressif.com
+      require: private
+      rules:
+      - if: $CONFIG{ETHERNET_SOC_EMAC_SUPPORTED} == 1
+      - if: $CONFIG{ETHERNET_PHY_USE_VSC8541} == 1
+      version: '*'
+    - matches:
+      - if: $CONFIG{ETHERNET_SPI_USE_W5500} == 1
+      name: espressif/w5500
+      registry_url: https://components.espressif.com
+      require: private
+      rules:
+      - if: idf_version >=6.0
+        version: ^2.0.0
+      version: '*'
+    - matches:
+      - if: $CONFIG{ETHERNET_SPI_USE_W6100} == 1
+      name: espressif/w6100
+      registry_url: https://components.espressif.com
+      require: private
+      version: ^1.0.0
+    - matches:
+      - if: idf_version >=6.1
+        version: ^0.2.0
+      name: espressif/yt8531
+      registry_url: https://components.espressif.com
+      require: private
+      rules:
+      - if: $CONFIG{ETHERNET_SOC_EMAC_SUPPORTED} == 1
+      - if: $CONFIG{ETHERNET_SOC_EMAC_SUPPORT_1000M} == 1
+      - if: $CONFIG{ETHERNET_PHY_USE_YT8531} == 1
+      version: '*'
+    - name: idf
+      require: private
+      version: '>=5.4.3,!=5.5.0,!=5.5.1'
     source:
-      path: C:\Users\allan\Documents\freETarget\Software\ESP32\components\espressif__led_strip
-      type: local
-    version: 2.4.1
-  espressif/mdns:
-    component_hash: 3ec0af5f6bce310512e90f482388d21cc7c0e99668172d2f895356165fc6f7c5
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.4.1
+  espressif/led_strip:
+    component_hash: 28621486f77229aaf81c71f5e15d6fbf36c2949cf11094e07090593e659e7639
     dependencies:
     - name: idf
       require: private
@@ -14,15 +147,26 @@ dependencies:
     source:
       registry_url: https://components.espressif.com/
       type: service
-    version: 1.8.2
+    version: 3.0.3
+  espressif/mdns:
+    component_hash: e81ca7a7f53ea34e78274df054da692c272e1315572876b237b1748e267c013b
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.11.3
   idf:
     source:
       type: idf
-    version: 5.3.1
+    version: 6.0.2
 direct_dependencies:
+- espressif/ethernet_init
 - espressif/led_strip
 - espressif/mdns
 - idf
-manifest_hash: 90ea5d3635d1795be92d96b50e771a91102f1d1204899bcd301813867e80d9a0
+manifest_hash: d0b7ab921659f9b650b87aa52389aee4b10cfdf8f33a71cd9fb3b49695d79e4f
 target: esp32s3
-version: 2.0.0
+version: 3.0.0

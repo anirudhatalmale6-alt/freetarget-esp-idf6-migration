@@ -15,7 +15,7 @@ void         target_name(char *name_space);                             // Retur
 int          to_int(char h);                                            // Convert char to integer ('A' = 0x0A)
 int          instr(char *s1, char *s2);                                 // Compare two strings
 int          stricmp(const char *s1, const char *s2);                   // Case-insensitive string comparison
-bool         contains(char *s1, char *s2);                              // Return true if s1 contains s2
+bool         contains(const char *s1, const char *s2); // TODO(IDF6): const - callers pass req->uri, which is const                              // Return true if s1 contains s2
 bool         prompt_for_confirm(void);                                  // Prompt for confirmation
 void         get_number(char *prompt, real_t *value);                   // Get a number from the user
 void         send_keep_alive(void);                                     // Send a keep alive message
@@ -24,7 +24,7 @@ void         bye_tick(void);                                            // Tick 
 void         echo_serial(int delay, int in_port, int out_port);         // Echo the serial port
 void         build_json_score(shot_record_t *shot, const char *format); // Create the JSON score string
 int          http_target_type(void);                                    // Cnovert the target type to a number
-void         squish(char *source, char *destination);                   // Convert the uri into an arguement
+void         squish(const char *source, char *destination); // TODO(IDF6): source is const - callers pass req->uri                   // Convert the uri into an arguement
 unsigned int hamming_weight(unsigned int word);                         // Add up the numbr of bits in a word
 void         to_binary(unsigned int x, unsigned int bits, char *s);     // Convert a number to a binary string
 void         watchdog(void);                                            // Monitor the target health

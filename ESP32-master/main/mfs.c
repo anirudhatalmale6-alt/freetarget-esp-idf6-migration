@@ -20,7 +20,7 @@
 #include "serial_io.h"
 #include "timer.h"
 #include "mfs.h"
-#include "ota.h"
+#include "OTA.h"
 #include "helpers.h"
 
 /*
@@ -344,7 +344,7 @@ void multifunction_switch(void)
  *-----------------------------------------------------*/
 static void sw_state(unsigned int action)
 {
-  mfs_action_t *mfs_ptr;
+  const mfs_action_t *mfs_ptr; // TODO(IDF6): const, to match mfs_find()
 
   DLT(DLT_DEBUG, SEND(CONSOLE, sprintf(_xs, "Switch action: %d", action);))
 
@@ -468,7 +468,10 @@ static void mfs_led_adjust(void)
  * be used.
  *
  *-----------------------------------------------------*/
-mfs_action_t *mfs_find(unsigned int action) // Switch to be displayed
+// TODO(IDF6): return type is now const. mfs_action[] is declared
+// const mfs_action_t[], so handing back &mfs_action[i] as a non-const
+// pointer discards the const. Nothing writes through the result.
+const mfs_action_t *mfs_find(unsigned int action) // Switch to be displayed
 {
   unsigned int i;
 

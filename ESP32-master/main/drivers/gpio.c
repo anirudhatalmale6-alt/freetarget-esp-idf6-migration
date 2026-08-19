@@ -8,8 +8,8 @@
 #include <string.h>
 #include "esp_log.h"
 #include "driver/rmt_tx.h"
-#include "gpio_types.h"
-#include "driver\gpio.h"
+#include "hal/gpio_types.h"
+#include "driver/gpio.h"
 #include "esp_timer.h"
 #include "led_strip_types.h"
 
@@ -294,32 +294,37 @@ void set_status_LED(char new_state[]          // New LED colours
       switch ( new_state[i] )
       {
         case 'r':              // RED LED
-          status[i].blink = 1; // Turn on Blinking
+          status[i].blink = 1;              // Turn on Blinking
+          __attribute__((fallthrough)); // TODO(IDF6): deliberate - lower case sets blink then falls into the colour
         case 'R':
           status[i].red = LED_ON;
           break;
 
         case 'y':              // YELLOW LED
-          status[i].blink = 1; // Turn on Blinking
+          status[i].blink = 1;              // Turn on Blinking
+          __attribute__((fallthrough)); // TODO(IDF6): deliberate
         case 'Y':
           status[i].red   = LED_ON / 3;
           status[i].green = LED_ON / 3;
           break;
 
         case 'g':              // GREEN LED
-          status[i].blink = 1; // Turn on Blinking
+          status[i].blink = 1;              // Turn on Blinking
+          __attribute__((fallthrough)); // TODO(IDF6): deliberate
         case 'G':
           status[i].green = LED_ON;
           break;
 
         case 'b':              // BLUE LED
           status[i].blink = 1;
+          __attribute__((fallthrough)); // TODO(IDF6): deliberate
         case 'B':
           status[i].blue = LED_ON;
           break;
 
         case 'w':
-          status[i].blink = 1; // WHITE LED
+          status[i].blink = 1;              // WHITE LED
+          __attribute__((fallthrough)); // TODO(IDF6): deliberate
         case 'W':
           status[i].red   = LED_ON / 3;
           status[i].green = LED_ON / 3;
@@ -1018,10 +1023,33 @@ void status_LED_test(void)
   int  i;
   char ch;
 
-  if ( ((IS_HOLD_C(rapid_C_LED)) && (IS_HOLD_C(rapid_D_LED))) || ((IS_HOLD_D(rapid_C_LED)) && (IS_HOLD_D(rapid_D_LED))) )
-  {
-    SEND(ALL, sprintf(_xs, "\r\nMFS_C or MFS_D not configured for output\r\n");)
-  }
+  /*
+   * TODO(IDF6): *** PLEASE LOOK AT THIS ONE *** - check commented out.
+   *
+   *   if ( ((IS_HOLD_C(rapid_C_LED)) && (IS_HOLD_C(rapid_D_LED)))
+   *     || ((IS_HOLD_D(rapid_C_LED)) && (IS_HOLD_D(rapid_D_LED))) )
+   *   {
+   *     SEND(ALL, sprintf(_xs, "\r\nMFS_C or MFS_D not configured for output\r\n");)
+   *   }
+   *
+   * IS_HOLD_C(x) expands to (json_mfs_hold_c == (x)). json_mfs_hold_c is an
+   * int holding an MFS action code, but rapid_C_LED and rapid_D_LED are
+   * FUNCTIONS, so this compares an int against a function address. GCC 15
+   * rejects it ("comparison between pointer and integer"); older compilers
+   * warned and carried on.
+   *
+   * It can never have been true - a function address will not equal a small
+   * action code - so this warning has never printed, and commenting it out
+   * changes nothing that happens today.
+   *
+   * What it looks like it wants is the action codes from mfs.h:
+   *
+   *   if ( (IS_HOLD_C(MFS_C_LED) == 0) && (IS_HOLD_D(MFS_D_LED) == 0) )
+   *
+   * but the exact combination you intended is a guess on my part and this
+   * is your production tree, so I have left it for you. It is diagnostic
+   * output inside status_LED_test() only - nothing else depends on it.
+   */
 
   SEND(ALL, sprintf(_xs, "\r\nSend * to advance test, ! to exit, R to restart\r\n");)
   serial_getch(ALL); // Clear the input

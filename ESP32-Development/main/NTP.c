@@ -12,12 +12,14 @@
 
 #include "stdbool.h"
 #include "esp_timer.h"
-#include "driver\timer.h"
+// TODO(IDF6): #include "driver/timer.h" removed. The legacy timer group
+// driver is deleted in 6.0; this file uses esp_timer_get_time() throughout
+// and never called it.
 
 #include "freETarget.h"
 // #include "helpers.h"
 #include "diag_tools.h"
-// #include "gpio_types.h"
+// #include "hal/gpio_types.h"
 // #include "json.h"
 #include "serial_io.h"
 #include "timer.h"
@@ -165,8 +167,11 @@ void NTP_client(void)
    */
   NTP_offset_array[0] = NTP_offset_time;             // Insert the latest
   NTP_base_array[0]   = NTP_base_time;
-  NTP_time_sort(&NTP_offset_array, RUNNING_SAMPLES); // Sort the oldest
-  NTP_time_sort(&NTP_base_array, RUNNING_SAMPLES);
+  // TODO(IDF6): the & has been dropped. NTP_offset_array and NTP_base_array
+  // are already arrays, so &array gave a time_count_64_t (*)[RUNNING_SAMPLES]
+  // where the function wants a time_count_64_t *. Same address either way.
+  NTP_time_sort(NTP_offset_array, RUNNING_SAMPLES); // Sort the oldest
+  NTP_time_sort(NTP_base_array, RUNNING_SAMPLES);
 
                                                      /*
                                                       *  When we get to the right number of samples
@@ -228,19 +233,19 @@ void NTP_time_sort(time_count_64_t in_array[], int size)
  * server
  *
  *---------------------------------------------------*/
-time_count_64_t NTP_time_us(void)
+int64_t NTP_time_us(void) // TODO(IDF6): was time_count_64_t (volatile) - see NTP.h
 {
   return esp_timer_get_time() // What time is it here
          + NTP_base_time      // What is the offset to the target
          + NTP_offset_time;   // The for the message to get here);
 }
 
-time_count_64_t NTP_time_ms(void)
+int64_t NTP_time_ms(void) // TODO(IDF6): was time_count_64_t (volatile) - see NTP.h
 {
   return (NTP_time_us() / 1000);
 }
 
-time_count_64_t NTP_time_s(void)
+int64_t NTP_time_s(void) // TODO(IDF6): was time_count_64_t (volatile) - see NTP.h
 {
   return (NTP_time_us() / 1000000);
 }

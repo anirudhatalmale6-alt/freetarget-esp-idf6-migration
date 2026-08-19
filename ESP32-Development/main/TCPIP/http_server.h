@@ -19,7 +19,10 @@ void connect_handler(void *arg, esp_event_base_t event_base, int32_t event_id, v
 int  get_url_arg(char *req_url, char *reply, int sizeof_reply);
 void http_send_string_start(httpd_req_t *req);                                                    // Start to send a string to the client
 void http_send_string(const char *str);                                                           // String to send to the client
-void http_send_string_end(); // Stop sending a string to the client and pump it out
+// TODO(IDF6): was  void http_send_string_end();  - an empty parameter list
+// means (void) in C23, so it now genuinely conflicts with the definition in
+// http_server.c, which takes a httpd_req_t *.
+void http_send_string_end(httpd_req_t *req); // Stop sending a string to the client and pump it out
 
 /*
  * #defines

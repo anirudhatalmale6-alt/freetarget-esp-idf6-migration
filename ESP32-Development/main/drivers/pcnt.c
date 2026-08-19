@@ -17,7 +17,8 @@
 #include "stdbool.h"
 #include "driver/pulse_cnt.h"
 #include "driver/gpio.h"
-#include "driver/timer.h"
+// TODO(IDF6): #include "driver/timer.h" removed. The legacy timer group
+// driver is deleted in 6.0, and nothing in this file ever called it.
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "nonvol.h"
@@ -32,6 +33,23 @@
 #include "serial_io.h"
 #include "json.h"
 #include "dac.h"
+
+/*
+ * TODO(IDF6): SOC_PCNT_UNITS_PER_GROUP no longer exists.
+ *
+ * It was in components/soc/esp32s3/include/soc/soc_caps.h up to 5.5 and is
+ * gone from 6.0 - the public soc_caps header was trimmed and this one did
+ * not survive. There is no renamed equivalent anywhere in the 6.0 tree; I
+ * checked. The value it had was 4, which is the number of PCNT units the
+ * ESP32-S3 actually has, so it is defined locally here.
+ *
+ * Kept as a macro with the same name so the array declarations below read
+ * exactly as they did. If you ever build this for a part with a different
+ * PCNT count, this is the line to change.
+ */
+#ifndef SOC_PCNT_UNITS_PER_GROUP
+#define SOC_PCNT_UNITS_PER_GROUP (4) // ESP32-S3
+#endif
 
 /*
  *  Working variables

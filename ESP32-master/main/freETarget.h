@@ -13,9 +13,12 @@
 #include "freertos/task.h"
 #include "serial_io.h"
 
+// TODO(IDF6): #undef added - see json.h.
 #ifdef FREETARGET_C
+#undef EXTERN
 #define EXTERN
 #else
+#undef EXTERN
 #define EXTERN extern
 #endif
 
