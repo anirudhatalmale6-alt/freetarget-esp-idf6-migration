@@ -124,9 +124,25 @@ static bool freeETarget_timer_isr_callback(gptimer_handle_t timer, const gptimer
  * system
  *
  *-----------------------------------------------------*/
-#define TIMER_DIVIDER (16)                   //  Hardware timer clock divider
-#define TIMER_SCALE   (1000 / TIMER_DIVIDER) // convert counter value to seconds
-#define ONE_MS        (80 * TIMER_SCALE)     // 1 ms timer interrupt
+/*
+ * TODO(IDF6): the 1 ms tick is now exactly 1 ms.
+ *
+ * It was:
+ *
+ *   #define TIMER_DIVIDER (16)                   //  Hardware timer clock divider
+ *   #define TIMER_SCALE   (1000 / TIMER_DIVIDER) // convert counter value to seconds
+ *   #define ONE_MS        (80 * TIMER_SCALE)     // 1 ms timer interrupt
+ *
+ * TIMER_SCALE is integer arithmetic, so 1000/16 truncated 62.5 to 62 and
+ * ONE_MS came out at 4960 counts - 992 us at the 5 MHz counter rate.
+ *
+ * TIMER_DIVIDER has no meaning under gptimer, which is configured with the
+ * counter rate itself rather than with a prescaler. ONE_MS is now derived
+ * from that same rate, so the two cannot drift apart and there is no integer
+ * division left to truncate.
+ */
+#define TIMER_RESOLUTION_HZ (5 * 1000 * 1000)            // gptimer counter rate: was APB 80 MHz / divider 16
+#define ONE_MS              (TIMER_RESOLUTION_HZ / 1000) // 5000 counts = 1000 us exactly
 
 /*
  * TODO(IDF6): ported from the legacy timer group driver to gptimer.
@@ -145,19 +161,23 @@ static bool freeETarget_timer_isr_callback(gptimer_handle_t timer, const gptimer
  * with timer_init / timer_set_alarm_value / timer_isr_callback_add /
  * timer_start on TIMER_GROUP_0, TIMER_1.
  *
- * The timing is reproduced exactly rather than tidied up:
+ * The counter rate is reproduced exactly; the alarm value is corrected:
  *
  *   APB is 80 MHz, divider 16, so the counter ticked at 5 MHz.
  *   gptimer takes the tick rate directly, hence resolution_hz = 5 000 000.
  *
  *   The old alarm value was ONE_MS = 80 * (1000/16) = 80 * 62 = 4960 counts.
  *   At 5 MHz that is 992 us, not 1000 us - the integer division in
- *   TIMER_SCALE truncates 62.5 to 62. So the "1 ms" tick has always run
- *   about 0.8 percent fast. I have kept 4960 because this is production
- *   firmware and everything downstream is calibrated against the tick you
- *   actually have. If you want a true millisecond, set the alarm to 5000 -
- *   but that shifts every timer in the system by 0.8 percent, so treat it as
- *   a deliberate change and not a bug fix.
+ *   TIMER_SCALE truncated 62.5 to 62, so the "1 ms" tick had always run
+ *   about 0.8 percent fast. It is 5000 counts now - see the ONE_MS note
+ *   above - and the interrupt arrives every 1000 us.
+ *
+ *   Nothing downstream had been calibrated against the old figure. This ISR
+ *   only samples the sensor RUN bits and drives the acquisition state
+ *   machine; it does not count time. Every software timer is decremented by
+ *   freeETarget_timers() on the FreeRTOS tick, and run_time_ms() and
+ *   run_time_seconds() read esp_timer_get_time(). The one thing that changes
+ *   is the sensor sampling rate: 1000 Hz where it used to be 1008 Hz.
  *
  *   auto_reload_on_alarm matches .auto_reload = 1.
  *   The counter is left at 0 on reload, matching timer_set_counter_value(0).
@@ -171,12 +191,12 @@ void freeETarget_timer_init(void)
   gptimer_config_t config = {
       .clk_src       = GPTIMER_CLK_SRC_DEFAULT,
       .direction     = GPTIMER_COUNT_UP,
-      .resolution_hz = 5 * 1000 * 1000, // 80 MHz APB / 16, as per TIMER_DIVIDER
+      .resolution_hz = TIMER_RESOLUTION_HZ, // 5 MHz - was APB 80 MHz / divider 16
   };
   ESP_ERROR_CHECK(gptimer_new_timer(&config, &freeETarget_timer_handle));
 
   gptimer_alarm_config_t alarm_config = {
-      .alarm_count                = ONE_MS, // 4960 counts at 5 MHz - see note above
+      .alarm_count                = ONE_MS, // 5000 counts at 5 MHz = 1 ms - see note above
       .reload_count               = 0,      // was timer_set_counter_value(..., 0)
       .flags.auto_reload_on_alarm = true,   // was .auto_reload = 1
   };

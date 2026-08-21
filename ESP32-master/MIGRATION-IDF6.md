@@ -16,19 +16,19 @@ Every change is tagged in the source with `TODO(IDF6):`. To find them all:
 grep -rn "TODO(IDF6)" main CMakeLists.txt
 ```
 
-There are 55 markers across 29 files. Most are explanatory - they say what
-moved and why. **Four need a decision from you**; they are marked
+There are 56 markers across 26 files. Most are explanatory - they say what
+moved and why. **Three need a decision from you**; they are marked
 `*** PLEASE LOOK AT THIS ONE ***` in the source and listed first below.
 
 This is your production tree, so the rule I worked to was: where a change
 could alter runtime behaviour, I preserved the existing behaviour and flagged
-it rather than "fixing" it.
+it rather than "fixing" it. The one exception is the 1 ms tick, which you
+asked me to correct - the section below explains why that turned out to be
+safe to do.
 
 ---
 
-## Needs your review
-
-### 1. `main/timer.c` - the 1 ms tick has been ported to a new driver
+## The 1 ms tick - ported to gptimer, and corrected
 
 Your timer used the **legacy timer group driver** - `timer_init()`,
 `timer_set_alarm_value()`, `timer_isr_callback_add()`, `TIMER_GROUP_0`,
@@ -36,26 +36,139 @@ Your timer used the **legacy timer group driver** - `timer_init()`,
 `components/driver/deprecated/`, and is **deleted outright in 6.0**. There is
 no header to point at and no compatibility shim.
 
-It is ported to `gptimer`. The timing is reproduced exactly rather than tidied
-up:
+It is ported to `gptimer`:
 
 | old | new |
 |---|---|
 | APB 80 MHz, `.divider = 16` | `resolution_hz = 5000000` |
-| `ONE_MS` = 4960 counts | `alarm_count = 4960` |
+| `ONE_MS` = 4960 counts (992 us) | `alarm_count = ONE_MS` = **5000 counts (1000 us)** |
 | `.auto_reload = 1` | `flags.auto_reload_on_alarm = true` |
 | `timer_set_counter_value(..., 0)` | `reload_count = 0` |
 
-One thing worth knowing: `TIMER_SCALE` is `(1000 / TIMER_DIVIDER)` in integer
-arithmetic, which truncates 62.5 to 62, so `ONE_MS` is 4960 counts = **992 us,
-not 1000**. Your "1 ms" tick has always run about 0.8% fast. I kept 4960
-because everything downstream is calibrated against the tick you actually
-have. Setting the alarm to 5000 gives a true millisecond but shifts every
-timer in the system by 0.8% - a deliberate change, not a bug fix.
+### Why it was 992 us
+
+`TIMER_SCALE` was `(1000 / TIMER_DIVIDER)` in integer arithmetic, so
+`1000 / 16` truncated 62.5 to 62 and `ONE_MS` came out at `80 * 62` = 4960
+counts. At the 5 MHz counter rate that is 992 us, so the "1 ms" tick had been
+running about 0.8% fast since the beginning.
+
+`TIMER_DIVIDER` has no meaning under gptimer - it is configured with the
+counter rate directly rather than with a prescaler - so `ONE_MS` is now
+derived from that same rate and there is no integer division left to
+truncate:
+
+```c
+#define TIMER_RESOLUTION_HZ (5 * 1000 * 1000)            // gptimer counter rate
+#define ONE_MS              (TIMER_RESOLUTION_HZ / 1000) // 5000 counts = 1000 us exactly
+```
+
+The two figures cannot drift apart now. If you ever change the counter rate,
+`ONE_MS` follows it.
+
+### Why this is safe on production firmware
+
+When I first sent this over I kept 4960 and flagged it, on the assumption
+that something downstream might be calibrated against the tick you actually
+had. Having gone back through it properly, nothing is:
+
+- **The ISR does not count time.** It samples the sensor RUN bits and drives
+  the `PORT_STATE_IDLE` / `WAIT` / `TIMEOUT` state machine. It contains no
+  counters and no decrements.
+- **Every software timer runs off FreeRTOS, not this timer.** They are
+  decremented by `freeETarget_timers()`, which is a task doing
+  `vTaskDelay(TICK_10ms)`. `ONE_SECOND` is 100 of those 10 ms ticks. `ONE_MS`
+  never enters that path.
+- **`run_time_seconds()` and `run_time_ms()` read `esp_timer_get_time()`**,
+  a separate microsecond clock.
+- **`shot_timer` and `ring_timer` are in 10 ms units**, set from
+  `MAX_WAIT_TIME` and `json_min_ring_time * ONE_SECOND / 1000`, and
+  decremented on the FreeRTOS tick like every other timer.
+
+So the whole effect of the change is the rate at which the sensors are
+polled: **1000 Hz where it used to be 1008 Hz.** Shot timing itself comes
+from the 10 MHz oscillator and the counter registers, which this does not
+touch.
+
+Binary size is unchanged at `0x1447c0`.
+
+### One observation, not changed
+
+`MAX_WAIT_TIME` is 10 and its comment reads "Wait up to 10 ms for the input
+to arrive". `shot_timer` is decremented in 10 ms units, so the actual wait is
+10 x 10 ms = **100 ms**. Either the comment or the constant is off by a
+factor of ten. I have not touched it - it has been like that for a long time
+and changing it would change behaviour - but it is worth a look when you are
+next in there.
 
 `drivers/pcnt.c` also included `driver/timer.h` but never called it. Removed.
 
-### 2. `main/freETarget.c` - `find_sensor()` returns a string when it fails
+---
+
+## The VS Code squiggles - "include file not found in browse path"
+
+This is an editor problem, not a build problem, which is exactly why the
+project compiles cleanly while `esp_ota_ops.h` and friends are underlined.
+Two causes:
+
+**1. `settings.json` forced the Tag Parser.**
+
+```json
+"C_Cpp.intelliSenseEngine": "Tag Parser"
+```
+
+The Tag Parser is the fallback engine. It does not read include paths or
+compiler flags at all - it fuzzy-matches symbols across whatever directories
+are listed in `browse.path`, and "include file not found in browse path" is
+its own wording. It has no way of knowing that `esp_ota_ops.h` lives in the
+`app_update` component, because that comes from `REQUIRES` in CMake, which
+the Tag Parser never sees. Set back to `"default"`.
+
+**2. `c_cpp_properties.json` described the include path by hand.**
+
+It listed `${config:idf.espIdfPath}/components/**` and nothing else. Under
+6.0 those headers moved - `hal` split into `esp_hal_gpio`, `esp_hal_ana_conv`
+and the rest - and `managed_components/` was never in that tree at all.
+
+It now reads `build/compile_commands.json` instead:
+
+```json
+"compileCommands": "${workspaceFolder}/build/compile_commands.json"
+```
+
+The build writes that file out on every run and it holds the exact flags used
+to compile every source file. Nothing to maintain, and it survives the next
+IDF version bump. To confirm it has what you need, the entry for
+`main/TCPIP/OTA.c` carries
+`-I.../components/app_update/include`, which is where `esp_ota_ops.h` lives.
+
+**Two machine-specific settings in `master` were also stale**, and I changed
+them to match what your Development package already had:
+
+| setting | was | now |
+|---|---|---|
+| `C_Cpp.default.compilerPath` | `...xtensa-esp32s3-elf/esp-2022r1-11.2.0/...` | `""` (taken from compile_commands.json) |
+| `idf.currentSetup` | `C:\Users\allan\esp\v5.3.1\esp-idf` | `C:\esp\v6.0.2\esp-idf` |
+
+The 11.2.0 toolchain is the 5.x one and does not exist in a 6.0 install.
+`idf.portWin` is left alone - `master` is on COM3 and Development on COM4,
+which I assume is deliberate.
+
+**To pick it up:**
+
+1. `idf.py build` once, so `build/compile_commands.json` exists (I strip
+   `build/` from the zip, and my copy would have Linux paths in it anyway).
+2. `Ctrl+Shift+P` -> **C/C++: Reset IntelliSense Database**
+3. `Ctrl+Shift+P` -> **Developer: Reload Window**
+
+If anything is still underlined after that, make sure the Microsoft C/C++
+extension is up to date - IDF 6.0 compiles as `-std=gnu23`, and older
+versions of the extension do not recognise that flag.
+
+---
+
+## Needs your review
+
+### 1. `main/freETarget.c` - `find_sensor()` returns a string when it fails
 
 ```c
 /*
@@ -75,7 +188,7 @@ cast it instead, which keeps today's behaviour exactly.
 The real fix is either to return `NULL` and add checks at the call sites, or
 to return a static "unknown sensor" record. Your call.
 
-### 3. `main/nonvol.c` - `nonvol_write_i32()` stored the pointer, not the value
+### 2. `main/nonvol.c` - `nonvol_write_i32()` stored the pointer, not the value
 
 ```c
 /* was */ nvs_set_i32(my_handle, name, value);    /* value is an int *  */
@@ -90,7 +203,7 @@ used to be a warning.
 previously written through this path is meaningless, so a factory reset may be
 in order once you are running again.
 
-### 4. `main/drivers/gpio.c` - a check in `status_LED_test()` is commented out
+### 3. `main/drivers/gpio.c` - a check in `status_LED_test()` is commented out
 
 ```c
 if ( ((IS_HOLD_C(rapid_C_LED)) && (IS_HOLD_C(rapid_D_LED))) || ... )

@@ -1,21 +1,25 @@
 {
+    // Include paths are read from build/compile_commands.json, which the
+    // build generates and which holds the exact flags used for every source
+    // file. Run "idf.py build" once, then Ctrl+Shift+P -> "C/C++: Reset
+    // IntelliSense Database" -> "Developer: Reload Window".
     "configurations": [
         {
             "name": "ESP-IDF",
+            "compileCommands": "${workspaceFolder}/build/compile_commands.json",
             "includePath": [
+                "${workspaceFolder}/main",
+                "${workspaceFolder}/main/drivers",
+                "${workspaceFolder}/main/TCPIP",
+                "${workspaceFolder}/**",
                 "${config:idf.espIdfPath}/components/**",
-                "${config:idf.espIdfPathWin}/components/**",
-                "${config:idf.espAdfPath}/components/**",
-                "${config:idf.espAdfPathWin}/components/**",
-                "${workspaceFolder}/**"
+                "${config:idf.espIdfPathWin}/components/**"
             ],
             "browse": {
                 "path": [
+                    "${workspaceFolder}",
                     "${config:idf.espIdfPath}/components",
-                    "${config:idf.espIdfPathWin}/components",
-                    "${config:idf.espAdfPath}/components/**",
-                    "${config:idf.espAdfPathWin}/components/**",
-                    "${workspaceFolder}"
+                    "${config:idf.espIdfPathWin}/components"
                 ],
                 "limitSymbolsToIncludedHeaders": false
             }
