@@ -1,8 +1,16 @@
 {
-    // Include paths are read from build/compile_commands.json, which the
-    // build generates and which holds the exact flags used for every source
-    // file. Run "idf.py build" once, then Ctrl+Shift+P -> "C/C++: Reset
-    // IntelliSense Database" -> "Developer: Reload Window".
+    // Include paths come from build/compile_commands.json, which the build
+    // regenerates on every run and which holds the exact flags used to
+    // compile every source file - including the IDF component includes.
+    //
+    // Nothing here refers to the IDF install path any more. The old
+    // ${config:idf.espIdfPath} entries read a setting owned by the ESP-IDF
+    // extension that lives in your USER settings, not this file, and on
+    // Windows the extension actually uses idf.espIdfPathWin - so that entry
+    // was either unresolved or left pointing at an older install.
+    //
+    // After a build:  Ctrl+Shift+P -> "C/C++: Reset IntelliSense Database"
+    //                 Ctrl+Shift+P -> "Developer: Reload Window"
     "configurations": [
         {
             "name": "ESP-IDF",
@@ -11,15 +19,11 @@
                 "${workspaceFolder}/main",
                 "${workspaceFolder}/main/drivers",
                 "${workspaceFolder}/main/TCPIP",
-                "${workspaceFolder}/**",
-                "${config:idf.espIdfPath}/components/**",
-                "${config:idf.espIdfPathWin}/components/**"
+                "${workspaceFolder}/**"
             ],
             "browse": {
                 "path": [
-                    "${workspaceFolder}",
-                    "${config:idf.espIdfPath}/components",
-                    "${config:idf.espIdfPathWin}/components"
+                    "${workspaceFolder}"
                 ],
                 "limitSymbolsToIncludedHeaders": false
             }
